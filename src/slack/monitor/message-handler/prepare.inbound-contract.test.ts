@@ -235,4 +235,156 @@ describe("slack prepareSlackMessage inbound contract", () => {
     expect(prepared).toBeTruthy();
     expect(prepared!.ctxPayload.MessageThreadId).toBe("1.000");
   });
+
+  it("includes thread id in metadata line for thread replies", async () => {
+    const slackCtx = createSlackMonitorContext({
+      cfg: {
+        channels: { slack: { enabled: true } },
+      } as OpenClawConfig,
+      accountId: "default",
+      botToken: "token",
+      app: {
+        client: {
+          conversations: {
+            replies: async () => ({
+              ok: true,
+              messages: [{ ts: "100.000", text: "thread parent", user: "U2" }],
+            }),
+          },
+        },
+      } as unknown as App,
+      runtime: {} as RuntimeEnv,
+      botUserId: "B1",
+      teamId: "T1",
+      apiAppId: "A1",
+      historyLimit: 0,
+      sessionScope: "per-sender",
+      mainKey: "main",
+      dmEnabled: true,
+      dmPolicy: "open",
+      allowFrom: [],
+      groupDmEnabled: true,
+      groupDmChannels: [],
+      defaultRequireMention: false,
+      groupPolicy: "open",
+      useAccessGroups: false,
+      reactionMode: "off",
+      reactionAllowlist: [],
+      replyToMode: "off",
+      threadHistoryScope: "thread",
+      threadInheritParent: false,
+      slashCommand: {
+        enabled: false,
+        name: "openclaw",
+        sessionPrefix: "slack:slash",
+        ephemeral: true,
+      },
+      textLimit: 4000,
+      ackReactionScope: "group-mentions",
+      mediaMaxBytes: 1024,
+      removeAckAfterReply: false,
+    });
+    // oxlint-disable-next-line typescript/no-explicit-any
+    slackCtx.resolveUserName = async () => ({ name: "Alice" }) as any;
+
+    const account: ResolvedSlackAccount = {
+      accountId: "default",
+      enabled: true,
+      botTokenSource: "config",
+      appTokenSource: "config",
+      config: {},
+    };
+
+    const message: SlackMessageEvent = {
+      channel: "C123",
+      channel_type: "channel",
+      user: "U1",
+      text: "reply in thread",
+      ts: "200.000",
+      thread_ts: "100.000",
+    } as SlackMessageEvent;
+
+    const prepared = await prepareSlackMessage({
+      ctx: slackCtx,
+      account,
+      message,
+      opts: { source: "message" },
+    });
+
+    expect(prepared).toBeTruthy();
+    // The metadata line should contain thread: <threadTs>
+    expect(prepared!.ctxPayload.Body).toContain("thread: 100.000");
+    expect(prepared!.ctxPayload.Body).toContain("channel: C123");
+  });
+
+  it("omits thread id in metadata line for non-thread messages", async () => {
+    const slackCtx = createSlackMonitorContext({
+      cfg: {
+        channels: { slack: { enabled: true } },
+      } as OpenClawConfig,
+      accountId: "default",
+      botToken: "token",
+      app: { client: {} } as App,
+      runtime: {} as RuntimeEnv,
+      botUserId: "B1",
+      teamId: "T1",
+      apiAppId: "A1",
+      historyLimit: 0,
+      sessionScope: "per-sender",
+      mainKey: "main",
+      dmEnabled: true,
+      dmPolicy: "open",
+      allowFrom: [],
+      groupDmEnabled: true,
+      groupDmChannels: [],
+      defaultRequireMention: false,
+      groupPolicy: "open",
+      useAccessGroups: false,
+      reactionMode: "off",
+      reactionAllowlist: [],
+      replyToMode: "off",
+      threadHistoryScope: "thread",
+      threadInheritParent: false,
+      slashCommand: {
+        enabled: false,
+        name: "openclaw",
+        sessionPrefix: "slack:slash",
+        ephemeral: true,
+      },
+      textLimit: 4000,
+      ackReactionScope: "group-mentions",
+      mediaMaxBytes: 1024,
+      removeAckAfterReply: false,
+    });
+    // oxlint-disable-next-line typescript/no-explicit-any
+    slackCtx.resolveUserName = async () => ({ name: "Alice" }) as any;
+
+    const account: ResolvedSlackAccount = {
+      accountId: "default",
+      enabled: true,
+      botTokenSource: "config",
+      appTokenSource: "config",
+      config: {},
+    };
+
+    const message: SlackMessageEvent = {
+      channel: "C123",
+      channel_type: "channel",
+      user: "U1",
+      text: "top level message",
+      ts: "1.000",
+    } as SlackMessageEvent;
+
+    const prepared = await prepareSlackMessage({
+      ctx: slackCtx,
+      account,
+      message,
+      opts: { source: "message" },
+    });
+
+    expect(prepared).toBeTruthy();
+    // No thread id should appear
+    expect(prepared!.ctxPayload.Body).not.toContain("thread:");
+    expect(prepared!.ctxPayload.Body).toContain("channel: C123");
+  });
 });
