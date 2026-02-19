@@ -110,10 +110,15 @@ export async function getReplyFromConfig(
     agentCfg?.typingIntervalSeconds ?? sessionCfg?.typingIntervalSeconds;
   const typingIntervalSeconds =
     typeof configuredTypingSeconds === "number" ? configuredTypingSeconds : 6;
+  const configuredTtlSeconds =
+    agentCfg?.typingTtlSeconds ?? sessionCfg?.typingTtlSeconds;
+  const typingTtlMs =
+    typeof configuredTtlSeconds === "number" ? configuredTtlSeconds * 1000 : undefined;
   const typing = createTypingController({
     onReplyStart: opts?.onReplyStart,
     onCleanup: opts?.onTypingCleanup,
     typingIntervalSeconds,
+    ...(typingTtlMs !== undefined && { typingTtlMs }),
     silentToken: SILENT_REPLY_TOKEN,
     log: defaultRuntime.log,
   });
